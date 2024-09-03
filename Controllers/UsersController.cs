@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AuthDemoAPI.DTOs.Users;
 using AuthDemoAPI.Entities.User;
 using AuthDemoAPI.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AuthDemoAPI.Controllers
@@ -25,6 +26,7 @@ namespace AuthDemoAPI.Controllers
             return Ok("Hello From Students Controller");
         }
 
+        [Authorize]
         [HttpGet("All")]
         public async Task<ActionResult<ICollection<CAppUser>>> GetAll()
         {
@@ -65,15 +67,8 @@ namespace AuthDemoAPI.Controllers
         {
             try
             {
-                var userValid = await _repo.Login(loginData);
-                if(userValid)
-                {
-                    return Ok("User logged in successfully");
-                } 
-                else 
-                {
-                    return BadRequest("Invalid username/password");
-                }
+                var token = await _repo.Login(loginData);
+                return Ok(token);
             }
             catch (Exception ex)
             {

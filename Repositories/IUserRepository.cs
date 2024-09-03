@@ -14,6 +14,6 @@ namespace AuthDemoAPI.Repositories
 
         public Task<bool> Delete(int id);
 
-        public Task<bool> Login(CLoginDto loginData);
+        public Task<string> Login(CLoginDto loginData);
     }
 }
