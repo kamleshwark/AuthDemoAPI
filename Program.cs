@@ -19,7 +19,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 //JWT setup
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]);
+var secretKey = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"] ?? "");
 
 builder.Services.AddAuthentication(options =>
     {

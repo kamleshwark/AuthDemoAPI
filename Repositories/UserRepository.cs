@@ -89,7 +89,7 @@ namespace AuthDemoAPI.Repositories
         private string GenerateJwtToken(CAppUser user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]));
+            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]??""));
             var signingCredentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
@@ -103,7 +103,7 @@ namespace AuthDemoAPI.Repositories
                 issuer: jwtSettings["Issuer"],
                 audience: jwtSettings["Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"])),
+                expires: DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"]??"1")),
                 signingCredentials: signingCredentials
             );
 
