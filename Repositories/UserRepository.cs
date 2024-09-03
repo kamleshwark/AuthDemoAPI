@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using AuthDemoAPI.Data;
 using AuthDemoAPI.DTOs.Users;
 using AuthDemoAPI.Entities.User;
+using AuthDemoAPI.Utility;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuthDemoAPI.Repositories
@@ -18,14 +19,16 @@ namespace AuthDemoAPI.Repositories
             
         }
 
-        public async Task<int> AddUser(CNewUserDto newUserData)
+        public async Task<int> Add(CNewUserDto newUserData)
         {
+            CPasswordHelper.CreatePasswordHash(newUserData.Password, out byte[] passwordHash, out byte[] passwordSalt);
+
             CAppUser newUser = new()
             {
                 UserName = newUserData.UserName,
                 Email = newUserData.EMail,
-                PasswordHash = new byte[1],
-                PasswordSalt = new byte[1]
+                PasswordHash = passwordHash,
+                PasswordSalt = passwordSalt
             };
 
             var alreadyExists = await _dbContext.Users.AnyAsync(s => s.UserName.ToLower()==newUser.UserName.ToLower()
@@ -44,9 +47,37 @@ namespace AuthDemoAPI.Repositories
             }
         }
 
+        public async Task<bool> Delete(int id)
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if(user != null) {
+                _dbContext.Users.Remove(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            else 
+            {
+                return false;
+            }
+        }
+
         public async Task<ICollection<CAppUser>> GetUsers()
         {
             return await _dbContext.Users.ToListAsync();
+        }
+
+        public async Task<bool> Login(CLoginDto loginData)
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == loginData.UserName.ToLower());
+            if(user != null)
+            {
+                bool passwordValid = CPasswordHelper.VerifyPasswordHash(loginData.Password, user.PasswordHash, user.PasswordSalt);
+                return passwordValid;
+            }
+            else 
+            {
+                return false;
+            }
         }
     }
 }

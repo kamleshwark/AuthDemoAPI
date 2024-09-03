@@ -10,6 +10,10 @@ namespace AuthDemoAPI.Repositories
     public interface IUserRepository
     {
         public Task<ICollection<CAppUser>> GetUsers();
-        public Task<int> AddUser(CNewUserDto newUserData);
+        public Task<int> Add(CNewUserDto newUserData);
+
+        public Task<bool> Delete(int id);
+
+        public Task<bool> Login(CLoginDto loginData);
     }
 }

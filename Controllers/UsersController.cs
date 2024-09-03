@@ -37,10 +37,45 @@ namespace AuthDemoAPI.Controllers
         {
             try
             {
-                int newUserId = await _repo.AddUser(newUserData);
+                int newUserId = await _repo.Add(newUserData);
                 return Ok(newUserId);
             }
             catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete("delete/{id}")]
+        public async Task<ActionResult<bool>> Delete(int id)
+        {
+            try
+            {
+                var result = await _repo.Delete(id);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("login")]
+        public async Task<ActionResult<string>> Login(CLoginDto loginData)
+        {
+            try
+            {
+                var userValid = await _repo.Login(loginData);
+                if(userValid)
+                {
+                    return Ok("User logged in successfully");
+                } 
+                else 
+                {
+                    return BadRequest("Invalid username/password");
+                }
+            }
+            catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }
