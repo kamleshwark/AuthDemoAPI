@@ -34,11 +34,13 @@ namespace AuthDemoAPI.Repositories
                 UserName = newUserData.UserName,
                 Email = newUserData.EMail,
                 PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt
+                PasswordSalt = passwordSalt,
+                CreatedOn = DateTime.Now,
+                IsActive = true
             };
 
-            var alreadyExists = await _dbContext.Users.AnyAsync(s => s.UserName.ToLower()==newUser.UserName.ToLower()
-                                        || (s.Email != null && newUser.Email!= null && s.Email.ToLower() == newUser.Email.ToLower()));
+            var alreadyExists = await _dbContext.Users.AnyAsync(s => s.UserName.ToLower() == newUser.UserName.ToLower()
+                                        || (s.Email != null && newUser.Email != null && s.Email.ToLower() == newUser.Email.ToLower()));
 
             if (!alreadyExists)
             {
@@ -56,12 +58,13 @@ namespace AuthDemoAPI.Repositories
         public async Task<bool> Delete(int id)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if(user != null) {
+            if (user != null)
+            {
                 _dbContext.Users.Remove(user);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            else 
+            else
             {
                 return false;
             }
@@ -74,40 +77,83 @@ namespace AuthDemoAPI.Repositories
 
         public async Task<string> Login(CLoginDto loginData)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == loginData.UserName.ToLower());
-            if(user != null)
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == loginData.UserName.ToLower()&&u.IsActive&&!u.MarkedDeleted);
+            if (user != null)
             {
                 bool passwordValid = CPasswordHelper.VerifyPasswordHash(loginData.Password, user.PasswordHash, user.PasswordSalt);
-                return GenerateJwtToken(user);
+                if (passwordValid)
+                {
+                    user.IncorrectPasswordCount = 0;
+                    user.LastLoggedInOn = DateTime.Now;
+                    await _dbContext.SaveChangesAsync();
+                    return GenerateJwtToken(user);
+                }
+                else {
+                    user.IncorrectPasswordCount++;
+                    await _dbContext.SaveChangesAsync();
+                    throw new Exception("Incorrect password");
+                }
+
             }
-            else 
+            else
             {
-                throw new Exception("Username password dont match");
+                throw new Exception("Username does not exist");
             }
         }
 
         private string GenerateJwtToken(CAppUser user)
         {
             var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]??""));
+            var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"] ?? ""));
             var signingCredentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
-        };
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+            };
 
             var tokenOptions = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"]??"1")),
-                signingCredentials: signingCredentials
-            );
+                            issuer: jwtSettings["Issuer"],
+                            audience: jwtSettings["Audience"],
+                            claims: claims,
+                            expires: DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"] ?? "1")),
+                            signingCredentials: signingCredentials
+                        );
 
             return new JwtSecurityTokenHandler().WriteToken(tokenOptions);
         }
+
+        public async Task<bool> ChangeActiveState(int id, bool newState)
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if(user != null)
+            {
+                user.IsActive = newState;
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            else 
+            {
+                throw new Exception("User doesnt exist");
+            }
+        }
+
+        public async Task<bool> ChangeDeletedState(int id, bool newState)
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if(user != null)
+            {
+                user.MarkedDeleted = newState;
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            else 
+            {
+                throw new Exception("User doesnt exist");
+            }
+        }
+
     }
 }

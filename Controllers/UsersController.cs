@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuthDemoAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("[controller]")]
     public class UsersController : ControllerBase
@@ -26,7 +27,21 @@ namespace AuthDemoAPI.Controllers
             return Ok("Hello From Students Controller");
         }
 
-        [Authorize]
+        [AllowAnonymous]
+        [HttpPut("login")]
+        public async Task<ActionResult<string>> Login(CLoginDto loginData)
+        {
+            try
+            {
+                var token = await _repo.Login(loginData);
+                return Ok(new {token});
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("All")]
         public async Task<ActionResult<ICollection<CAppUser>>> GetAll()
         {
@@ -34,6 +49,7 @@ namespace AuthDemoAPI.Controllers
             return Ok(allUsers);
         }
 
+        [Authorize]
         [HttpPost("new")]
         public async Task<ActionResult<int>> AddNewUser(CNewUserDto newUserData)
         {
@@ -62,13 +78,56 @@ namespace AuthDemoAPI.Controllers
             }
         }
 
-        [HttpPut("login")]
-        public async Task<ActionResult<string>> Login(CLoginDto loginData)
+
+        [HttpPut("activate/{id}")]
+        public async Task<ActionResult<bool>> Activate(int id)
         {
             try
             {
-                var token = await _repo.Login(loginData);
-                return Ok(token);
+                var result = await _repo.ChangeActiveState(id, true);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("deactivate/{id}")]
+        public async Task<ActionResult<bool>> Deactivate(int id)
+        {
+            try
+            {
+                var result = await _repo.ChangeActiveState(id, false);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("markDeleted/{id}")]
+        public async Task<ActionResult<bool>> MarkDeleted(int id)
+        {
+            try
+            {
+                var result = await _repo.ChangeDeletedState(id, true);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("markNotDeleted/{id}")]
+        public async Task<ActionResult<bool>> MarkNotDeleted(int id)
+        {
+            try
+            {
+                var result = await _repo.ChangeDeletedState(id, false);
+                return Ok(result);
             }
             catch (Exception ex)
             {
