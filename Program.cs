@@ -4,6 +4,8 @@ using AuthDemoAPI.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using AuthDemoAPI.Entities.User;
+using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +18,16 @@ builder.Services.AddDbContext<DataContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+builder.Services.AddIdentityCore<CAppUser>(opt => 
+{
+    opt.Password.RequireNonAlphanumeric = false;
+    opt.Lockout.MaxFailedAccessAttempts = 5;
+})
+    .AddRoles<CRole>()
+    .AddRoleManager<RoleManager<CRole>>()
+    .AddEntityFrameworkStores<DataContext>();
 
 //JWT setup
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -59,6 +71,25 @@ app.UseEndpoints(endpoint =>
 {
     _ = endpoint.MapControllers();
 });
+
+
+using var scope = app.Services.CreateScope();
+var services = scope.ServiceProvider;
+try
+{
+    var context = services.GetRequiredService<DataContext>();
+    await context.Database.MigrateAsync();
+
+    var userManager = services.GetRequiredService<UserManager<CAppUser>>();
+    var roleManager = services.GetRequiredService<RoleManager<CRole>>();
+    await Seeder.SeedRoles(roleManager);
+    await Seeder.SeedUsers(userManager);
+}
+catch (Exception ex)
+{
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occured during migration");
+}
 
 app.UseHttpsRedirection();
 

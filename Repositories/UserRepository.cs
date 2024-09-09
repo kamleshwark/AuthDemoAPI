@@ -9,91 +9,97 @@ using AuthDemoAPI.Data;
 using AuthDemoAPI.DTOs.Users;
 using AuthDemoAPI.Entities.User;
 using AuthDemoAPI.Utility;
+using AutoMapper;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuthDemoAPI.Repositories
 {
-    public class UserRepository : IUserRepository
+    public class UserRepository(UserManager<CAppUser> _userManager, IConfiguration _configuration) : IUserRepository
     {
-        private readonly DataContext _dbContext;
-        private readonly IConfiguration _configuration;
-
-        public UserRepository(DataContext dbContext, IConfiguration configuration)
+        private async Task<bool> UserExists(string userName)
         {
-            _dbContext = dbContext;
-            _configuration = configuration;
+            return await _userManager.Users.AnyAsync(u => u.NormalizedUserName == userName.ToUpper());
         }
-
-        public async Task<int> Add(CNewUserDto newUserData)
+        public async Task<int> Register(CNewUserDto newUserData)
         {
-            CPasswordHelper.CreatePasswordHash(newUserData.Password, out byte[] passwordHash, out byte[] passwordSalt);
-
+            if(await UserExists(newUserData.UserName))
+            {
+                throw new Exception("Username already taken");
+            }
             CAppUser newUser = new()
             {
-                UserName = newUserData.UserName,
+                UserName = newUserData.UserName.ToLower(),
                 Email = newUserData.EMail,
-                PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt,
-                CreatedOn = DateTime.Now,
-                IsActive = true
             };
 
-            var alreadyExists = await _dbContext.Users.AnyAsync(s => s.UserName.ToLower() == newUser.UserName.ToLower()
-                                        || (s.Email != null && newUser.Email != null && s.Email.ToLower() == newUser.Email.ToLower()));
-
-            if (!alreadyExists)
-            {
-                await _dbContext.Users.AddAsync(newUser);
-                await _dbContext.SaveChangesAsync();
-
+            var result = await _userManager.CreateAsync(newUser, newUserData.Password);
+            if(result.Succeeded) {
+                await _userManager.AddToRolesAsync(newUser, newUserData.Roles);
                 return newUser.Id;
             }
             else
             {
-                throw new Exception("User with same name or email id already exists");
+                var errorList = result.Errors.ToList();
+                string error = "";
+                foreach (var er in errorList)
+                {
+                    error += er.Code +"-->"+er.Description + "\n";
+                }
+                throw new Exception(error);
             }
         }
 
         public async Task<bool> Delete(int id)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _userManager.FindByIdAsync(id.ToString());
             if (user != null)
             {
-                _dbContext.Users.Remove(user);
-                await _dbContext.SaveChangesAsync();
+                await _userManager.DeleteAsync(user);
                 return true;
             }
             else
             {
-                return false;
+                throw new Exception("User not found");
             }
         }
 
-        public async Task<ICollection<CAppUser>> GetUsers()
+        public async Task<List<CUserToReturnDto>> GetUsers()
         {
-            return await _dbContext.Users.ToListAsync();
+            var users =  await _userManager.Users.Select(u => new CUserToReturnDto
+            {
+                Id=u.Id, 
+                UserName = u.UserName, 
+                FullName = u.FullName, 
+                Email = u.Email,
+                Roles = u.UserRoleMaps.Select(m=> m.Role.Name??"").ToList()
+            }).ToListAsync();
+            return users;
         }
 
         public async Task<string> Login(CLoginDto loginData)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName.ToLower() == loginData.UserName.ToLower()&&u.IsActive&&!u.MarkedDeleted);
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == loginData.UserName.ToUpper()&&u.IsActive&&!u.MarkedDeleted);
             if (user != null)
             {
-                bool passwordValid = CPasswordHelper.VerifyPasswordHash(loginData.Password, user.PasswordHash, user.PasswordSalt);
+                if (await _userManager.IsLockedOutAsync(user))
+                {
+                    throw new Exception($"User is locked out. Try again after {user.LockoutEnd}");
+                }
+                var passwordValid = await _userManager.CheckPasswordAsync(user, loginData.Password);
                 if (passwordValid)
                 {
-                    user.IncorrectPasswordCount = 0;
-                    user.LastLoggedInOn = DateTime.Now;
-                    await _dbContext.SaveChangesAsync();
-                    return GenerateJwtToken(user);
+                    user.LastLoginAt = DateTime.Now;
+                    await _userManager.UpdateAsync(user);
+                    await _userManager.ResetAccessFailedCountAsync(user);
+                    return await GenerateJwtToken(user);
                 }
                 else {
-                    user.IncorrectPasswordCount++;
-                    await _dbContext.SaveChangesAsync();
+                    await _userManager.AccessFailedAsync(user);
                     throw new Exception("Incorrect password");
                 }
-
             }
             else
             {
@@ -101,18 +107,24 @@ namespace AuthDemoAPI.Repositories
             }
         }
 
-        private string GenerateJwtToken(CAppUser user)
+        private async Task<string> GenerateJwtToken(CAppUser user)
         {
+            if(user.UserName == null) 
+            {
+                throw new Exception("sername required");
+            }
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"] ?? ""));
             var signingCredentials = new SigningCredentials(secretKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.Name, user.UserName),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
+            var roles = await _userManager.GetRolesAsync(user);
+            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
             var tokenOptions = new JwtSecurityToken(
                             issuer: jwtSettings["Issuer"],
@@ -125,13 +137,30 @@ namespace AuthDemoAPI.Repositories
             return new JwtSecurityTokenHandler().WriteToken(tokenOptions);
         }
 
+        public async Task<bool> UpdateRoles(CUpdateRolesDto roleData)
+        {
+            var user = await _userManager.FindByIdAsync(roleData.Id.ToString());
+            if(user != null)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                await _userManager.AddToRolesAsync(user, roleData.Roles.Except(roles));
+                await _userManager.RemoveFromRolesAsync(user, roles.Except(roleData.Roles));
+            }
+            else
+            {
+                throw new Exception("User not found");
+            }
+
+            return true;
+        }
+
         public async Task<bool> ChangeActiveState(int id, bool newState)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _userManager.FindByIdAsync(id.ToString());
             if(user != null)
             {
                 user.IsActive = newState;
-                await _dbContext.SaveChangesAsync();
+                await _userManager.UpdateAsync(user);
                 return true;
             }
             else 
@@ -142,11 +171,11 @@ namespace AuthDemoAPI.Repositories
 
         public async Task<bool> ChangeDeletedState(int id, bool newState)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _userManager.FindByIdAsync(id.ToString());
             if(user != null)
             {
                 user.MarkedDeleted = newState;
-                await _dbContext.SaveChangesAsync();
+                await _userManager.UpdateAsync(user);
                 return true;
             }
             else 

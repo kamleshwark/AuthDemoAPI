@@ -9,8 +9,10 @@ namespace AuthDemoAPI.Repositories
 {
     public interface IUserRepository
     {
-        public Task<ICollection<CAppUser>> GetUsers();
-        public Task<int> Add(CNewUserDto newUserData);
+        public Task<List<CUserToReturnDto>> GetUsers();
+        public Task<int> Register(CNewUserDto newUserData);
+
+        public Task<bool> UpdateRoles(CUpdateRolesDto roleData);
 
         public Task<bool> Delete(int id);
 

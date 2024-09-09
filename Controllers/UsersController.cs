@@ -43,22 +43,43 @@ namespace AuthDemoAPI.Controllers
         }
 
         [HttpGet("All")]
-        public async Task<ActionResult<ICollection<CAppUser>>> GetAll()
-        {
-            var allUsers = await _repo.GetUsers();
-            return Ok(allUsers);
-        }
-
-        [Authorize]
-        [HttpPost("new")]
-        public async Task<ActionResult<int>> AddNewUser(CNewUserDto newUserData)
+        public async Task<ActionResult> GetAll()
         {
             try
             {
-                int newUserId = await _repo.Add(newUserData);
+                var allUsers = await _repo.GetUsers();
+                return Ok(allUsers);
+            }
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("register")]
+        public async Task<ActionResult<int>> Register(CNewUserDto newUserData)
+        {
+            try
+            {
+                int newUserId = await _repo.Register(newUserData);
                 return Ok(newUserId);
             }
             catch (System.Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("UpdateRoles")]
+        public async Task<ActionResult> UpdateRoles(CUpdateRolesDto roleData)
+        {
+            try
+            {
+                var result = await _repo.UpdateRoles(roleData);
+                return Ok(result);
+            }
+            catch (Exception ex)
             {
                 return BadRequest(ex.Message);
             }

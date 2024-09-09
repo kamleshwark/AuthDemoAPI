@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Identity;
+
 namespace AuthDemoAPI.Entities.User
 {
-    public class CRole
+    public class CRole:IdentityRole<int>
     {
-       public int Id { get; set; } 
-       public required string Name { get; set; }
+        public ICollection<CUserRoleMap> UserRoleMaps { get; set; } = [];
     }
 }
