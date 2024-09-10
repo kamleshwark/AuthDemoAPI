@@ -8,9 +8,13 @@ namespace AuthDemoAPI.DTOs.Users
     public class CUserToReturnDto
     {
         public int Id { get; set; }
-        public string? UserName { get; set; }
-        public string? FullName { get; set; }
-        public string? Email { get; set; }
-        public List<String> Roles { get; set; } = [];
+        //User Name
+        public string? nm { get; set; }
+        //Fullname
+        public string? fnm { get; set; }
+        //Email
+        public string? em { get; set; }
+        //Roles
+        public List<String> r { get; set; } = [];
     }
 }

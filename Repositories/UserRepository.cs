@@ -68,13 +68,13 @@ namespace AuthDemoAPI.Repositories
 
         public async Task<List<CUserToReturnDto>> GetUsers()
         {
-            var users =  await _userManager.Users.Select(u => new CUserToReturnDto
+            var users = await _userManager.Users.Select(u => new CUserToReturnDto
             {
-                Id=u.Id, 
-                UserName = u.UserName, 
-                FullName = u.FullName, 
-                Email = u.Email,
-                Roles = u.UserRoleMaps.Select(m=> m.Role.Name??"").ToList()
+                Id = u.Id,
+                nm = u.UserName,
+                fnm = u.FullName,
+                em = u.Email,
+                r = u.UserRoleMaps.Select(m => m.Role.Name ?? "").ToList()
             }).ToListAsync();
             return users;
         }
