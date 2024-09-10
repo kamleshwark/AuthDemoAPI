@@ -155,5 +155,34 @@ namespace AuthDemoAPI.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("ResetPassword/{Id}")]
+        public async Task<ActionResult> ResetPassword(int id)
+        {
+            try
+            {
+                return Ok(await _repo.ResetPassword(id));
+            }
+            catch (Exception ex)
+            {
+                
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPut("ChangePassword")]
+        public async Task<ActionResult> ChangePassword(CChangePasswordDto data)
+        {
+            try
+            {
+                return Ok(await _repo.ChangePassword(data));
+            }
+            catch (Exception ex)
+            {
+                
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

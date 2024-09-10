@@ -184,5 +184,49 @@ namespace AuthDemoAPI.Repositories
             }
         }
 
+        public async Task<bool> ResetPassword(int id)
+        {
+            var user = await _userManager.FindByIdAsync(id.ToString());
+            if(user != null)
+            {
+                var defaultPassword = _configuration["DefaultPassword"];
+                if (defaultPassword != null)
+                {
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                    await _userManager.ResetPasswordAsync(user, token, defaultPassword);
+                    return true;
+                }
+                else
+                {
+                    throw new Exception("Default password not set");
+                }
+            }
+            else 
+            {
+                throw new Exception("User doesnt exist");
+            }
+        }
+
+        public async Task<bool> ChangePassword(CChangePasswordDto data)
+        {
+            var user = await _userManager.FindByIdAsync(data.Id.ToString());
+            if (user != null)
+            {
+                var result = await _userManager.ChangePasswordAsync(user, data.OldPassword, data.NewPassword);
+                if (result.Succeeded)
+                {
+                    return true;
+                }
+                else
+                {
+                    var errors = result.Errors.Select(e => e.Description).ToList();
+                    throw new Exception(string.Join("\n", errors));
+                }
+            }
+            else 
+            {
+                throw new Exception("User doesnt exist");
+            }
+        }
     }
 }

@@ -35,7 +35,8 @@ builder.Services.AddIdentityCore<CAppUser>(opt =>
 })
     .AddRoles<CRole>()
     .AddRoleManager<RoleManager<CRole>>()
-    .AddEntityFrameworkStores<DataContext>();
+    .AddEntityFrameworkStores<DataContext>()
+    .AddDefaultTokenProviders();
 
 //JWT setup
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");

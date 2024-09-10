@@ -21,5 +21,8 @@ namespace AuthDemoAPI.Repositories
         public Task<bool> ChangeActiveState(int id, bool newState);
 
         public Task<bool> ChangeDeletedState(int id, bool newState);
+
+        public Task<bool> ResetPassword(int id);
+        public Task<bool> ChangePassword(CChangePasswordDto data);
     }
 }
