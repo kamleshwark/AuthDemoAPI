@@ -17,6 +17,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<DataContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddCors();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
@@ -62,9 +63,14 @@ builder.Services.AddAuthentication(options =>
     });
 
 //End JWT setup
-builder.Services.AddControllers();
 
+
+builder.Services.AddControllers();
 var app = builder.Build();
+
+app.UseCors(x => x.AllowAnyHeader().AllowAnyMethod().
+                    WithOrigins("http://localhost:4200"));
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

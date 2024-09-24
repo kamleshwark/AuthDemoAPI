@@ -16,7 +16,7 @@ namespace AuthDemoAPI.Repositories
 
         public Task<bool> Delete(int id);
 
-        public Task<string> Login(CLoginDto loginData);
+        public Task<CLoginResultDto> Login(CLoginDto loginData);
 
         public Task<bool> ChangeActiveState(int id, bool newState);
 

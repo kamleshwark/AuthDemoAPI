@@ -33,8 +33,8 @@ namespace AuthDemoAPI.Controllers
         {
             try
             {
-                var token = await _repo.Login(loginData);
-                return Ok(new {token});
+                var result = await _repo.Login(loginData);
+                return Ok(result);
             }
             catch (Exception ex)
             {

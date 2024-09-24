@@ -79,14 +79,14 @@ namespace AuthDemoAPI.Repositories
             return users;
         }
 
-        public async Task<string> Login(CLoginDto loginData)
+        public async Task<CLoginResultDto> Login(CLoginDto loginData)
         {
             var user = await _userManager.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == loginData.UserName.ToUpper()&&u.IsActive&&!u.MarkedDeleted);
             if (user != null)
             {
                 if (await _userManager.IsLockedOutAsync(user))
                 {
-                    throw new Exception($"User is locked out. Try again after {user.LockoutEnd}");
+                    return new CLoginResultDto{Code=101, Message=$"User is locked out. Try again after {user.LockoutEnd}"};
                 }
                 var passwordValid = await _userManager.CheckPasswordAsync(user, loginData.Password);
                 if (passwordValid)
@@ -94,16 +94,17 @@ namespace AuthDemoAPI.Repositories
                     user.LastLoginAt = DateTime.Now;
                     await _userManager.UpdateAsync(user);
                     await _userManager.ResetAccessFailedCountAsync(user);
-                    return await GenerateJwtToken(user);
+                    var token = await GenerateJwtToken(user);
+                    return new CLoginResultDto{Code=0, Message=token};;
                 }
                 else {
                     await _userManager.AccessFailedAsync(user);
-                    throw new Exception("Incorrect password");
+                    return new CLoginResultDto{Code=102, Message="Incorrect password"};
                 }
             }
             else
             {
-                throw new Exception("Username does not exist");
+                return new CLoginResultDto{Code=102, Message="Username does not exist"};
             }
         }
 
