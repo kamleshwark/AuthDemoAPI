@@ -94,8 +94,9 @@ namespace AuthDemoAPI.Repositories
                     user.LastLoginAt = DateTime.Now;
                     await _userManager.UpdateAsync(user);
                     await _userManager.ResetAccessFailedCountAsync(user);
-                    var token = await GenerateJwtToken(user);
-                    return new CLoginResultDto{Code=0, Message=token};;
+                    var result = await GetLoginResult(user);
+                    
+                    return result;
                 }
                 else {
                     await _userManager.AccessFailedAsync(user);
@@ -104,11 +105,26 @@ namespace AuthDemoAPI.Repositories
             }
             else
             {
-                return new CLoginResultDto{Code=102, Message="Username does not exist"};
+                return new CLoginResultDto{Code=103, Message="Username does not exist"};
             }
         }
 
-        private async Task<string> GenerateJwtToken(CAppUser user)
+
+        private async Task<CLoginResultDto> GetLoginResult(CAppUser user)
+        {
+            var result = new CLoginResultDto
+            {
+                Code = 0,
+                UserId = user.Id,
+                UserName = user.UserName,
+                Roles = [.. (await _userManager.GetRolesAsync(user))]
+            };
+            var token = GenerateJwtToken(result);
+            result.Token = token;
+            return result;
+        }
+
+        private string GenerateJwtToken(CLoginResultDto user)
         {
             if(user.UserName == null) 
             {
@@ -120,21 +136,22 @@ namespace AuthDemoAPI.Repositories
 
             var claims = new List<Claim>
             {
-                new(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
+                new(JwtRegisteredClaimNames.NameId, user.UserId.ToString()),
                 new(JwtRegisteredClaimNames.Name, user.UserName),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
-            var roles = await _userManager.GetRolesAsync(user);
+            var roles = user.Roles;
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
+            user.TokenExpiresOn = DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"] ?? "1"));
             var tokenOptions = new JwtSecurityToken(
                             issuer: jwtSettings["Issuer"],
                             audience: jwtSettings["Audience"],
                             claims: claims,
-                            expires: DateTime.Now.AddMinutes(double.Parse(jwtSettings["ExpiryMinutes"] ?? "1")),
+                            expires: user.TokenExpiresOn,
                             signingCredentials: signingCredentials
                         );
-
+            
             return new JwtSecurityTokenHandler().WriteToken(tokenOptions);
         }
 
